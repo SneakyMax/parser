@@ -20,8 +20,6 @@ var COMMENT = 'COMMENT'
 var RESULT = 'RESULT'
 var TODO = 'TODO'
 
-var COMMENT_BLOCK_PADDING_SIZE = 2
-
 var REGEXES = {
   test: /^#\s+(.+)/,
   assertion: new RegExp('^(not )?ok\\b(?:(?:\\s+(\\d+))?(?:\\s+(?:(?:\\s*-\\s*)?(.*)))?)?'),
@@ -32,9 +30,11 @@ var REGEXES = {
   skip: /^(.*?)\s*#\s*SKIP\s+(.*)$/
 }
 
-var removeCommentBlockPadding = R.map(R.drop(COMMENT_BLOCK_PADDING_SIZE))
+var getBaseCommentPadding = R.compose(R.prop('length'), R.nth(1), R.match(/^(\s+)---/), R.nth(0))
+var removeCommentBlockPadding = R.converge(R.map, [R.converge(R.drop, [getBaseCommentPadding]), R.identity]);
 var parseYamlBlock = R.pipe(
   removeCommentBlockPadding,
+  R.slice(1, -1),
   R.join('\n'),
   jsYaml.safeLoad
 )
@@ -252,10 +252,8 @@ function getAssertionsWithComments (assertions$, blocks$) {
       R.equals(COMMENT_BLOCK_START)
     ))
     .flatMap(function (line) {
-
       return blocks$.take(1)
         .map(function (rawDiagnostic) {
-
           return {
             raw: line.current.raw,
             lineNumber: line.current.number,
@@ -397,7 +395,7 @@ function isCommentBlockStart (line) {
     return false
   }
 
-  return line.indexOf('  ---') === 0
+  return line.match(/^\s+---/);
 }
 
 function isCommentBlockEnd (line) {
@@ -406,7 +404,7 @@ function isCommentBlockEnd (line) {
     return false
   }
 
-  return line.indexOf('  ...') === 0
+  return line.match(/^\s+\.\.\./);
 }
 
 function isAssertion (line) {
